@@ -464,17 +464,16 @@ describe('Currying', () => {
         {
           "op": "replace",
           "path": [
-            "list",
-            "length",
-          ],
-          "value": 1,
-        },
-        {
-          "op": "replace",
-          "path": [
             "foo",
           ],
           "value": "bar",
+        },
+        {
+          "op": "remove",
+          "path": [
+            "list",
+            1,
+          ],
         },
       ]
     `);

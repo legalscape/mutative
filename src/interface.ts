@@ -1,4 +1,5 @@
 import { dataTypes } from './constant';
+import { ArrayChange } from './patch';
 
 export const enum DraftType {
   Object,
@@ -48,6 +49,8 @@ export interface ProxyDraft<T = any> {
   setMap?: Map<any, ProxyDraft>;
   assignedMap?: Map<any, boolean>;
   callbacks?: ((patches?: Patches, inversePatches?: Patches) => void)[];
+  arrayChanges?: Array<ArrayChange>;
+  indexChange?: { old?: number; new?: number };
 }
 
 interface IPatch {

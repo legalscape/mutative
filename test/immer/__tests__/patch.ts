@@ -1065,16 +1065,16 @@ describe('#468', () => {
     expect(nextState).toEqual([{ id: 2 }, { id: 1 }]);
     expect(patches).toEqual([
       {
-        op: 'replace',
-        path: [0, 'id'],
-        value: 2,
-      },
-      {
         op: 'add',
         path: [1],
         value: {
           id: 1,
         },
+      },
+      {
+        op: 'replace',
+        path: [0, 'id'],
+        value: 2,
       },
     ]);
 

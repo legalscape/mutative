@@ -39,14 +39,14 @@ test('patches should not contain `array.length` - arrayLengthAssignment: false, 
         "op": "remove",
         "path": [
           "list",
-          2,
+          0,
         ],
       },
       {
         "op": "remove",
         "path": [
           "list",
-          1,
+          0,
         ],
       },
       {
@@ -66,13 +66,13 @@ test('patches should not contain `array.length` - arrayLengthAssignment: false, 
           "list",
           0,
         ],
-        "value": 1,
+        "value": 3,
       },
       {
         "op": "add",
         "path": [
           "list",
-          1,
+          0,
         ],
         "value": 2,
       },
@@ -80,9 +80,9 @@ test('patches should not contain `array.length` - arrayLengthAssignment: false, 
         "op": "add",
         "path": [
           "list",
-          2,
+          0,
         ],
-        "value": 3,
+        "value": 1,
       },
     ]
   `);
@@ -116,12 +116,25 @@ test('patches should contain `array.length` - arrayLengthAssignment: true, pathA
   expect(patches).toMatchInlineSnapshot(`
     [
       {
-        "op": "replace",
+        "op": "remove",
         "path": [
           "list",
-          "length",
+          0,
         ],
-        "value": 0,
+      },
+      {
+        "op": "remove",
+        "path": [
+          "list",
+          0,
+        ],
+      },
+      {
+        "op": "remove",
+        "path": [
+          "list",
+          0,
+        ],
       },
     ]
   `);
@@ -133,13 +146,13 @@ test('patches should contain `array.length` - arrayLengthAssignment: true, pathA
           "list",
           0,
         ],
-        "value": 1,
+        "value": 3,
       },
       {
         "op": "add",
         "path": [
           "list",
-          1,
+          0,
         ],
         "value": 2,
       },
@@ -147,9 +160,9 @@ test('patches should contain `array.length` - arrayLengthAssignment: true, pathA
         "op": "add",
         "path": [
           "list",
-          2,
+          0,
         ],
-        "value": 3,
+        "value": 1,
       },
     ]
   `);
@@ -183,9 +196,16 @@ test('patches should contain `array.length` - arrayLengthAssignment: true, pathA
   expect(patches).toMatchInlineSnapshot(`
     [
       {
-        "op": "replace",
-        "path": "/list/length",
-        "value": 0,
+        "op": "remove",
+        "path": "/list/0",
+      },
+      {
+        "op": "remove",
+        "path": "/list/0",
+      },
+      {
+        "op": "remove",
+        "path": "/list/0",
       },
     ]
   `);
@@ -194,17 +214,17 @@ test('patches should contain `array.length` - arrayLengthAssignment: true, pathA
       {
         "op": "add",
         "path": "/list/0",
-        "value": 1,
+        "value": 3,
       },
       {
         "op": "add",
-        "path": "/list/1",
+        "path": "/list/0",
         "value": 2,
       },
       {
         "op": "add",
-        "path": "/list/2",
-        "value": 3,
+        "path": "/list/0",
+        "value": 1,
       },
     ]
   `);
@@ -238,9 +258,16 @@ test('patches should not contain `array.length` - arrayLengthAssignment: false, 
   expect(patches).toMatchInlineSnapshot(`
     [
       {
-        "op": "replace",
-        "path": "/list/length",
-        "value": 0,
+        "op": "remove",
+        "path": "/list/0",
+      },
+      {
+        "op": "remove",
+        "path": "/list/0",
+      },
+      {
+        "op": "remove",
+        "path": "/list/0",
       },
     ]
   `);
@@ -249,17 +276,17 @@ test('patches should not contain `array.length` - arrayLengthAssignment: false, 
       {
         "op": "add",
         "path": "/list/0",
-        "value": 1,
+        "value": 3,
       },
       {
         "op": "add",
-        "path": "/list/1",
+        "path": "/list/0",
         "value": 2,
       },
       {
         "op": "add",
-        "path": "/list/2",
-        "value": 3,
+        "path": "/list/0",
+        "value": 1,
       },
     ]
   `);
