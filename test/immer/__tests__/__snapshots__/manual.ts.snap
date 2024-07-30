@@ -33,17 +33,17 @@ exports[`manual - proxy should support patches drafts 1`] = `
     ],
     [
       {
+        "op": "remove",
+        "path": [
+          "b",
+        ],
+      },
+      {
         "op": "replace",
         "path": [
           "a",
         ],
         "value": 1,
-      },
-      {
-        "op": "remove",
-        "path": [
-          "b",
-        ],
       },
     ],
   ],

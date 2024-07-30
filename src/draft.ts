@@ -32,6 +32,7 @@ import {
 } from './utils';
 import { checkReadable } from './unsafe';
 import { generatePatches } from './patch';
+import { diffArrays } from 'diff';
 
 const draftsCache = new WeakSet<object>();
 
@@ -222,6 +223,91 @@ const proxyHandler: ProxyHandler<ProxyDraft> = {
   },
 };
 
+// 現在のproxyDraftの祖先全てのarrayをfinalizeする。alignmentを保存しておくことで、get(copy, key!)に使用するkeyが計算できるようになる
+// finalities.draft内のcallbackで計算されるのはin-placeな変更をした要素に限られるが、その他の要素はAdd、Removeで子要素全体が操作されるので問題ない
+/* TODO: テストケース
+- ネストした配列
+- 複数の配列に代入されるオブジェクト
+*/
+function finalizeParentArrays(
+  _proxyDraft: ProxyDraft,
+  patches?: Patches,
+  inversePatches?: Patches
+) {
+  const proxyDraft = _proxyDraft.parent;
+  if (!proxyDraft) {
+    return;
+  }
+  finalizeParentArrays(proxyDraft, patches, inversePatches);
+
+  if (proxyDraft.type !== DraftType.Array) {
+    return;
+  }
+  // TODO: 必要か確認
+  if (!proxyDraft.copy) {
+    for (let i = 0; i < proxyDraft.original.length; i++) {
+      const childDraft = getProxyDraft(proxyDraft.original[i]);
+      if (childDraft) {
+        childDraft.indexChange = { old: i, new: i };
+      }
+    }
+    return;
+  }
+
+  const changes = diffArrays(proxyDraft.original, proxyDraft.copy, {
+    comparator: (a: any, b: any) =>
+      (getProxyDraft(a)?.original ?? a) === (getProxyDraft(b)?.original ?? b),
+  });
+
+  let oldIndex = 0;
+  let newIndex = 0;
+  const arrayChanges: ProxyDraft['arrayChanges'] = [];
+  for (const change of changes) {
+    if (change.added) {
+      for (let i = 0; i < change.value.length; i += 1) {
+        const childDraft = getProxyDraft(proxyDraft.copy[newIndex]);
+        if (childDraft) {
+          childDraft.indexChange = { new: newIndex };
+        }
+        newIndex += 1;
+      }
+      arrayChanges.push({ op: 'added', count: change.value.length });
+    } else if (change.removed) {
+      for (let i = 0; i < change.value.length; i += 1) {
+        const childDraft = getProxyDraft(proxyDraft.original[oldIndex]);
+        if (childDraft) {
+          childDraft.indexChange = { old: oldIndex };
+        }
+        oldIndex += 1;
+      }
+      arrayChanges.push({ op: 'removed', count: change.value.length });
+    } else {
+      for (let i = 0; i < change.value.length; i += 1) {
+        const childDraft =
+          getProxyDraft(proxyDraft.original[oldIndex]) ??
+          getProxyDraft(proxyDraft.copy[newIndex]);
+        if (childDraft) {
+          childDraft.indexChange = { old: oldIndex, new: newIndex };
+        }
+        oldIndex += 1;
+        newIndex += 1;
+      }
+      arrayChanges.push({ op: 'unchanged', count: change.value.length });
+    }
+  }
+  proxyDraft.arrayChanges = arrayChanges;
+
+  finalizeSetValue(proxyDraft);
+  finalizePatches(proxyDraft, generatePatches, patches, inversePatches);
+
+  // TODO: check
+  //   if (__DEV__ && target.options.enableAutoFreeze) {
+  //     target.options.updatedValues =
+  //       target.options.updatedValues ?? new WeakMap();
+  //     target.options.updatedValues.set(updatedValue, proxyDraft.original);
+  //   }
+}
+
 export function createDraft<T extends object>(createDraftOptions: {
   original: T;
   parentDraft?: ProxyDraft | null;
@@ -262,9 +348,11 @@ export function createDraft<T extends object>(createDraftOptions: {
     const target = parentDraft;
     target.finalities.draft.push((patches, inversePatches) => {
       const oldProxyDraft = getProxyDraft(proxy)!;
-      // if target is a Set draft, `setMap` is the real Set copies proxy mapping.
+      finalizeParentArrays(oldProxyDraft, patches, inversePatches);
+
       let copy = target.type === DraftType.Set ? target.setMap : target.copy;
-      const draft = get(copy, key!);
+      const newKey = oldProxyDraft.indexChange?.new ?? key;
+      const draft = get(copy, newKey!);
       const proxyDraft = getProxyDraft(draft);
       if (proxyDraft) {
         // assign the updated value to the copy object
@@ -280,7 +368,7 @@ export function createDraft<T extends object>(createDraftOptions: {
           target.options.updatedValues.set(updatedValue, proxyDraft.original);
         }
         // final update value
-        set(copy, key!, updatedValue);
+        set(copy, newKey!, updatedValue);
       }
       // !case: handle the deleted key
       oldProxyDraft.callbacks?.forEach((callback) => {
@@ -307,7 +395,11 @@ export function finalizeDraft<T>(
   inversePatches?: Patches,
   enableAutoFreeze?: boolean
 ) {
+  // console.log('finalizeDraft', result);
   const proxyDraft = getProxyDraft(result);
+  for (const f of proxyDraft?.finalities.draft ?? []) {
+    // console.log(f.toString());
+  }
   const original = proxyDraft?.original ?? result;
   const hasReturnedValue = !!returnedValue.length;
   if (proxyDraft?.operated) {

@@ -1,5 +1,13 @@
 import { DraftType, Operation, Patches, ProxyDraft } from './interface';
-import { cloneIfNeeded, escapePath, get, has, isEqual } from './utils';
+import {
+  cloneIfNeeded,
+  escapePath,
+  get,
+  getProxyDraft,
+  has,
+  isEqual,
+} from './utils';
+import { diffArrays } from 'diff';
 
 function generateArrayPatches(
   proxyState: ProxyDraft<Array<any>>,
@@ -8,8 +16,151 @@ function generateArrayPatches(
   inversePatches: Patches,
   pathAsArray: boolean
 ) {
+  // return generateArrayPatchesNaively(
+  return generateArrayPatchesByDiff(
+    proxyState,
+    basePath,
+    patches,
+    inversePatches,
+    pathAsArray
+  );
+}
+
+export type ArrayChange = {
+  op: 'unchanged' | 'added' | 'removed';
+  count: number;
+};
+
+type ArrayChangeWithReplace =
+  | ArrayChange
+  | {
+      op: 'replace';
+      count: number;
+    };
+
+function modifyChangesToWithReplace<T>(changes: Array<ArrayChangeWithReplace>) {
+  for (let i = 0; i < changes.length - 1; i++) {
+    let added: ArrayChangeWithReplace;
+    let removed: ArrayChangeWithReplace;
+
+    if (changes[i].op === 'added' && changes[i + 1].op === 'removed') {
+      added = changes[i];
+      removed = changes[i + 1];
+    } else if (changes[i].op === 'removed' && changes[i + 1].op === 'added') {
+      added = changes[i + 1];
+      removed = changes[i];
+    } else {
+      // eslint-disable-next-line no-continue
+      continue;
+    }
+
+    if (added.count < removed.count) {
+      changes[i] = {
+        op: 'replace' as const,
+        count: added.count,
+      };
+      changes[i + 1] = {
+        op: 'removed' as const,
+        count: removed.count - added.count,
+      };
+    } else {
+      changes[i] = {
+        op: 'replace' as const,
+        count: removed.count,
+      };
+      changes[i + 1] = {
+        op: 'added' as const,
+        count: added.count - removed.count,
+      };
+    }
+  }
+}
+
+function generateArrayPatchesByDiff(
+  proxyState: ProxyDraft<Array<any>>,
+  basePath: any[],
+  patches: Patches,
+  inversePatches: Patches,
+  pathAsArray: boolean
+) {
+  let { original } = proxyState;
+  let copy = proxyState.copy!;
+
+  const changes =
+    proxyState.arrayChanges ??
+    diffArrays(original, copy, {
+      comparator: (a: any, b: any) =>
+        (getProxyDraft(a)?.original ?? a) === (getProxyDraft(b)?.original ?? b),
+    }).map((change) => ({
+      op: change.added ? 'added' : change.removed ? 'removed' : 'unchanged',
+      count: change.value.length,
+    }));
+
+  modifyChangesToWithReplace(changes as Array<ArrayChangeWithReplace>);
+
+  let oldIndex = 0;
+  let newIndex = 0;
+  for (const change of changes) {
+    if (change.op === 'added') {
+      for (let i = 0; i < change.count; i += 1) {
+        patches.push({
+          op: Operation.Add,
+          path: escapePath(basePath.concat([newIndex]), pathAsArray),
+          value: cloneIfNeeded(copy[newIndex]),
+        });
+        inversePatches.push({
+          op: Operation.Remove,
+          path: escapePath(basePath.concat([newIndex]), pathAsArray),
+        });
+        newIndex += 1;
+      }
+    } else if (change.op === 'removed') {
+      for (let i = 0; i < change.count; i += 1) {
+        patches.push({
+          op: Operation.Remove,
+          path: escapePath(basePath.concat([newIndex]), pathAsArray),
+        });
+        inversePatches.push({
+          op: Operation.Add,
+          path: escapePath(basePath.concat([newIndex]), pathAsArray),
+          value: cloneIfNeeded(original[oldIndex]),
+        });
+        oldIndex += 1;
+      }
+    } else if (change.op === 'unchanged') {
+      for (let i = 0; i < change.count; i += 1) {
+        newIndex += 1;
+        oldIndex += 1;
+      }
+    } else if (change.op === 'replace') {
+      for (let i = 0; i < change.count; i += 1) {
+        patches.push({
+          op: Operation.Replace,
+          path: escapePath(basePath.concat([newIndex]), pathAsArray),
+          value: cloneIfNeeded(copy[newIndex]),
+        });
+        inversePatches.push({
+          op: Operation.Replace,
+          path: escapePath(basePath.concat([newIndex]), pathAsArray),
+          value: cloneIfNeeded(original[oldIndex]),
+        });
+        newIndex += 1;
+        oldIndex += 1;
+      }
+    }
+  }
+}
+
+function generateArrayPatchesNaively(
+  proxyState: ProxyDraft<Array<any>>,
+  basePath: any[],
+  patches: Patches,
+  inversePatches: Patches,
+  pathAsArray: boolean
+) {
   let { original, assignedMap, options } = proxyState;
   let copy = proxyState.copy!;
+
   if (copy.length < original.length) {
     [original, copy] = [copy, original];
     [patches, inversePatches] = [inversePatches, patches];
@@ -114,7 +265,7 @@ function generateSetPatches(
         path,
         value,
       });
-      inversePatches.unshift({
+      inversePatches.push({
         op: Operation.Add,
         path,
         value,
@@ -132,7 +283,7 @@ function generateSetPatches(
         path,
         value,
       });
-      inversePatches.unshift({
+      inversePatches.push({
         op: Operation.Remove,
         path,
         value,

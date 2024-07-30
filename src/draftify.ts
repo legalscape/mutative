@@ -52,7 +52,11 @@ export function draftify<
         );
       return (
         options.enablePatches
-          ? [finalizedState, finalizedPatches, finalizedInversePatches]
+          ? [
+              finalizedState,
+              finalizedPatches,
+              finalizedInversePatches?.reverse(),
+            ]
           : finalizedState
       ) as Result<T, O, F>;
     },

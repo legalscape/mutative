@@ -186,8 +186,8 @@ function runBaseTest(name, autoFreeze, useListener) {
           { op: 'remove', path: ['b'] },
         ],
         [
-          { op: 'add', path: ['a'], value: 'b' },
           { op: 'add', path: ['b'], value: 'c' },
+          { op: 'add', path: ['a'], value: 'b' },
         ],
       ]);
     });
