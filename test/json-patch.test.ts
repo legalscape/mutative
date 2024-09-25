@@ -314,3 +314,24 @@ test('edge key - apply with string path', () => {
   const nextState = apply(data, patches);
   expect(nextState).toEqual(state);
 });
+
+test('issue', () => {
+  const numbers = [0, 1, 2, 3];
+  const data = numbers.map((id) => ({ id }));
+
+  const [state, patches, inversePatches] = create(
+    data,
+    (draft) => {
+      draft[3].id += 1;
+      draft.splice(0, 1);
+    },
+    {
+      enablePatches: true,
+    }
+  );
+
+  const prevState = apply(state, inversePatches);
+  expect(prevState).toEqual(data);
+  const nextState = apply(data, patches);
+  expect(nextState).toEqual(state);
+});
